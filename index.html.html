@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>오늘의 지출 & 알바 다이어리</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts (Gaegu & Noto Sans KR) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Chart.js for visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Canvas Confetti for rewards -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        chiikawaPink: '#FFF0F5',
+                        chiikawaPinkDark: '#FFB6C1',
+                        chiikawaYellow: '#FFFBE6',
+                        chiikawaYellowDark: '#FFD700',
+                        chiikawaBlue: '#E6F4FE',
+                        chiikawaBlueDark: '#79C9FA',
+                        chiikawaGreen: '#EBFBEE',
+                        chiikawaBorder: '#4A3E3D',
+                        chiikawaCard: '#FFFFFF'
+                    },
+                    fontFamily: {
+                        gaegu: ['Gaegu', 'cursive'],
+                        sans: ['Noto Sans KR', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #FFF5F7;
+            color: #4A3E3D;
+        }
+        .font-gaegu {
+            font-family: 'Gaegu', cursive;
+        }
+        
+        /* Chii Dance & Eat Animations */
+        @keyframes dance {
+            0%, 100% { transform: rotate(-5deg) translateY(0); }
+            50% { transform: rotate(5deg) translateY(-8px); }
+        }
+        .animate-chii-dance {
+            animation: dance 0.4s infinite ease-in-out;
+        }
+
+        @keyframes happy-eat {
+            0%, 100% { transform: scale(1); }
+            25% { transform: scale(1.1) rotate(3deg); }
+            75% { transform: scale(1.05) rotate(-3deg); }
+        }
+        .animate-chii-eat {
+            animation: happy-eat 0.5s infinite ease-in-out;
+        }
+
+        /* Stamp animation */
+        @keyframes stamp-appear {
+            0% { transform: scale(3) rotate(-15deg); opacity: 0; }
+            50% { transform: scale(0.9) rotate(-15deg); opacity: 1; }
+            70% { transform: scale(1.05) rotate(-15deg); }
+            100% { transform: scale(1) rotate(-15deg); opacity: 1; }
+        }
+        .stamp-animate {
+            animation: stamp-appear 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #F1F1F1;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #FFB6C1;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #FF9EAA;
+        }
+
+        .border-dashed-custom {
+            border-style: dashed;
+            border-width: 2px;
+        }
+    </style>
+</head>
+<body class="min-h-screen pb-12 flex flex-col items-center justify-start">
+
+    <!-- Header Navigation -->
+    <header class="w-full max-w-md bg-white border-b-4 border-chiikawaBorder px-4 py-3 sticky top-0 z-40 shadow-sm flex items-center justify-between">
+        <div class="flex items-center gap-2">
+            <div class="w-9 h-9 bg-pink-100 rounded-full border-2 border-chiikawaBorder flex items-center justify-center font-bold text-pink-600 font-gaegu text-xl">
+                🐰
+            </div>
+            <div>
+                <h1 class="font-gaegu text-2xl font-bold leading-none text-gray-800">오늘의 지출 & 알바 다이어리</h1>
+                <p class="text-[10px] text-gray-500 font-sans">차곡차곡 모으는 재미있는 용돈 관리</p>
+            </div>
+        </div>
+        <div class="bg-pink-100 border-2 border-chiikawaBorder px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 shadow-inner">
+            <span class="text-pink-600"><i class="fa-solid fa-coins"></i></span>
+            <span id="userBalanceDisplay">0</span> 원
+        </div>
+    </header>
+
+    <!-- Main Container (Mobile App Viewport) -->
+    <main class="w-full max-w-md p-4 flex-1 flex flex-col gap-5">
+
+        <!-- 1. Interactive Character Stage Card -->
+        <section class="bg-gradient-to-b from-pink-100 via-pink-50 to-white rounded-3xl border-4 border-chiikawaBorder p-5 relative overflow-hidden shadow-md flex flex-col items-center min-h-[220px] justify-between">
+            <!-- Background Decorations -->
+            <div class="absolute top-2 left-3 text-pink-400 text-xs font-bold font-gaegu"><i class="fa-solid fa-sparkles"></i> 반짝반짝</div>
+            <div class="absolute top-2 right-3 text-pink-400 text-xs font-bold font-gaegu"><i class="fa-solid fa-star"></i> 모아보자!</div>
+
+            <!-- Speech Bubble -->
+            <div id="speechBubble" class="relative bg-white border-2 border-chiikawaBorder px-4 py-2 rounded-2xl shadow-sm text-center mb-2 max-w-[85%] font-gaegu text-xl">
+                <span id="speechText">오늘도 아껴서 용돈을 차곡차곡 모아봐요!</span>
+                <!-- Bubble Tail -->
+                <div class="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-chiikawaBorder"></div>
+            </div>
+
+            <!-- Simple White Rabbit SVG -->
+            <div class="relative w-44 h-40 flex items-center justify-center my-1" id="characterContainer">
+                
+                <svg id="usagiSvg" class="w-36 h-36 transition-transform duration-300" viewBox="0 0 140 160">
+                    <!-- Simple Straight Ears -->
+                    <!-- Left Ear -->
+                    <path d="M 45 60 C 40 10 58 10 58 60 Z" fill="#FFFFFF" stroke="#382B2A" stroke-width="3.5" stroke-linejoin="round" />
+                    <path d="M 48 55 C 45 25 54 25 54 55 Z" fill="#FFB6C1" opacity="0.6" />
+
+                    <!-- Right Ear -->
+                    <path d="M 82 60 C 82 10 100 10 95 60 Z" fill="#FFFFFF" stroke="#382B2A" stroke-width="3.5" stroke-linejoin="round" />
+                    <path d="M 86 55 C 86 25 95 25 92 55 Z" fill="#FFB6C1" opacity="0.6" />
+
+                    <!-- Main Head & Body -->
+                    <circle cx="70" cy="95" r="42" fill="#FFFFFF" stroke="#382B2A" stroke-width="3.5" />
+
+                    <!-- Pink Cheeks -->
+                    <ellipse cx="48" cy="98" rx="8" ry="5" fill="#FFB6C1" opacity="0.8" />
+                    <ellipse cx="92" cy="98" rx="8" ry="5" fill="#FFB6C1" opacity="0.8" />
+
+                    <!-- Eyes -->
+                    <circle cx="58" cy="90" r="4.5" fill="#382B2A" />
+                    <circle cx="82" cy="90" r="4.5" fill="#382B2A" />
+                    <circle cx="57" cy="88.5" r="1.5" fill="#FFFFFF" />
+                    <circle cx="81" cy="88.5" r="1.5" fill="#FFFFFF" />
+
+                    <!-- Simple Cute Nose & Mouth -->
+                    <path d="M 67 95 L 73 95 L 70 98 Z" fill="#FFB6C1" stroke="#382B2A" stroke-width="1.5" />
+                    <path d="M 70 98 Q 66 103 63 100 M 70 98 Q 74 103 77 100" fill="none" stroke="#382B2A" stroke-width="2.5" stroke-linecap="round" />
+
+                    <!-- Small Paws -->
+                    <ellipse cx="52" cy="120" rx="7" ry="5" fill="#FFFFFF" stroke="#382B2A" stroke-width="3" />
+                    <ellipse cx="88" cy="120" rx="7" ry="5" fill="#FFFFFF" stroke="#382B2A" stroke-width="3" />
+                </svg>
+
+                <!-- Floating/Held Item Overlay -->
+                <div id="heldItemOverlay" class="absolute inset-0 pointer-events-none flex items-center justify-center">
+                    <!-- Dynamic Item gets injected here via JS -->
+                </div>
+            </div>
+
+            <!-- Character Action Status Bar -->
+            <div class="w-full flex justify-between items-center text-xs font-bold text-gray-500 bg-white/80 backdrop-blur px-3 py-1.5 rounded-full border border-pink-200">
+                <span id="statusMood"><i class="fa-solid fa-face-smile text-pink-400"></i> 상태: 기분 좋음</span>
+                <span id="unlockedItemsCount" class="text-pink-500"><i class="fa-solid fa-gift"></i> 아이템 0개 해금</span>
+            </div>
+        </section>
+
+        <!-- Navigation Tabs -->
+        <nav class="flex rounded-2xl bg-gray-200 p-1 border-2 border-chiikawaBorder font-gaegu text-lg font-bold">
+            <button onclick="switchTab('ledger')" id="tabLedger" class="flex-1 py-2 rounded-xl bg-white shadow-sm border border-chiikawaBorder text-pink-500 transition-all">
+                <i class="fa-solid fa-pen-to-square"></i> 가계부 (알바/지출)
+            </button>
+            <button onclick="switchTab('wishlist')" id="tabWishlist" class="flex-1 py-2 rounded-xl text-gray-600 transition-all">
+                <i class="fa-solid fa-heart"></i> 위시리스트
+            </button>
+            <button onclick="switchTab('report')" id="tabReport" class="flex-1 py-2 rounded-xl text-gray-600 transition-all">
+                <i class="fa-solid fa-chart-pie"></i> 주간 리포트
+            </button>
+        </nav>
+
+        <!-- TAB 1: LEDGER -->
+        <div id="sectionLedger" class="space-y-4">
+            
+            <!-- Quick Add Action Buttons -->
+            <div class="grid grid-cols-2 gap-3">
+                <button onclick="openModal('income')" class="bg-pink-100 hover:bg-pink-200 border-3 border-chiikawaBorder p-3 rounded-2xl flex items-center gap-3 shadow-[2px_4px_0px_#4A3E3D] active:translate-y-1 active:shadow-none transition-all">
+                    <div class="w-10 h-10 bg-pink-400 border-2 border-chiikawaBorder rounded-full flex items-center justify-center text-white text-lg">
+                        <i class="fa-solid fa-envelope-open-text"></i>
+                    </div>
+                    <div class="text-left">
+                        <div class="font-gaegu text-xl font-bold leading-none text-pink-900">알바 보수 받기</div>
+                        <div class="text-[11px] text-pink-700 font-sans">+ 수입 등록하기</div>
+                    </div>
+                </button>
+
+                <button onclick="openModal('expense')" class="bg-rose-100 hover:bg-rose-200 border-3 border-chiikawaBorder p-3 rounded-2xl flex items-center gap-3 shadow-[2px_4px_0px_#4A3E3D] active:translate-y-1 active:shadow-none transition-all">
+                    <div class="w-10 h-10 bg-rose-400 border-2 border-chiikawaBorder rounded-full flex items-center justify-center text-white text-lg">
+                        <i class="fa-solid fa-utensils"></i>
+                    </div>
+                    <div class="text-left">
+                        <div class="font-gaegu text-xl font-bold leading-none text-rose-900">맛있는 것/소품 쓰기</div>
+                        <div class="text-[11px] text-rose-700 font-sans">- 지출 등록하기</div>
+                    </div>
+                </button>
+            </div>
+
+            <!-- Transaction History List -->
+            <div class="bg-white rounded-3xl border-3 border-chiikawaBorder p-4 shadow-sm">
+                <div class="flex justify-between items-center mb-3 pb-2 border-b-2 border-dashed border-gray-200">
+                    <h3 class="font-gaegu text-xl font-bold text-gray-800 flex items-center gap-1.5">
+                        <i class="fa-solid fa-receipt text-pink-400"></i> 최근 생활 기록
+                    </h3>
+                    <span class="text-xs text-gray-400" id="itemCountText">총 0건</span>
+                </div>
+
+                <div id="transactionList" class="space-y-2 max-h-60 overflow-y-auto pr-1">
+                    <!-- Dynamic Transaction Items will be rendered here -->
+                    <div class="text-center py-8 text-gray-400 text-sm">
+                        <i class="fa-solid fa-cookie-bite text-3xl mb-1 text-gray-300 block"></i>
+                        아직 기록이 없어요! <br>첫 알바 보수나 지출을 입력해 보세요.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: WISHLIST -->
+        <div id="sectionWishlist" class="space-y-4 hidden">
+            <div class="bg-pink-100/60 rounded-3xl border-3 border-chiikawaBorder p-4 shadow-sm">
+                <div class="flex items-center gap-3 mb-2">
+                    <div class="w-12 h-12 bg-pink-400 rounded-2xl border-2 border-chiikawaBorder flex items-center justify-center text-white text-2xl">
+                        <i class="fa-solid fa-heart"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-gaegu text-2xl font-bold leading-none text-pink-900">나의 위시리스트</h3>
+                        <p class="text-xs text-pink-800">돈을 모아서 사고 싶은 목표를 달성하고 해금해요!</p>
+                    </div>
+                </div>
+
+                <!-- Add Custom Wish Button -->
+                <button onclick="openWishModal()" class="w-full mt-2 py-2 bg-white hover:bg-pink-50 border-2 border-dashed border-pink-400 text-pink-600 rounded-xl font-gaegu text-lg font-bold transition-all">
+                    + 새로운 위시목표 추가하기
+                </button>
+            </div>
+
+            <!-- Wish Items Grid -->
+            <div id="wishlistContainer" class="space-y-3">
+                <!-- Wish items dynamically rendered here -->
+            </div>
+        </div>
+
+        <!-- TAB 3: REPORT (주간 경제 리포트) -->
+        <div id="sectionReport" class="space-y-4 hidden">
+            <!-- Weekly Feedback Stamp Banner -->
+            <div class="bg-yellow-50 rounded-3xl border-3 border-chiikawaBorder p-4 shadow-sm relative overflow-hidden">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <span class="bg-yellow-200 text-yellow-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-yellow-400">이번 주 소비 리포트</span>
+                        <h3 class="font-gaegu text-2xl font-bold text-gray-800 mt-1" id="reportTitle">칭찬도장 받는 중...</h3>
+                    </div>
+                    <!-- Stamp graphic container -->
+                    <div id="stampBadge" class="w-20 h-20 flex items-center justify-center transform -rotate-12 border-4 border-red-500 rounded-full text-red-500 font-gaegu font-bold text-lg text-center p-1 leading-tight shadow-lg opacity-0 bg-white/80">
+                        참 잘했어요! <br><i class="fa-solid fa-star text-xs"></i>
+                    </div>
+                </div>
+                <p id="reportFeedbackText" class="text-xs text-gray-600 mt-2 leading-relaxed">
+                    지출을 기록하면 치이카와가 주간 알바/지출 균형을 분석해 칭찬 도장을 찍어줘요!
+                </p>
+            </div>
+
+            <!-- Expense Category Flask Chart -->
+            <div class="bg-white rounded-3xl border-3 border-chiikawaBorder p-4 shadow-sm">
+                <h4 class="font-gaegu text-xl font-bold text-gray-800 mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-vial text-purple-400"></i> 카테고리별 지출 시약병
+                </h4>
+                
+                <div class="h-48 w-full flex items-center justify-center">
+                    <canvas id="categoryChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Summary Stats Cards -->
+            <div class="grid grid-cols-2 gap-3">
+                <div class="bg-green-50 rounded-2xl border-2 border-chiikawaBorder p-3">
+                    <div class="text-xs text-green-700 font-bold">이번 주 총 알바 보수</div>
+                    <div class="font-gaegu text-2xl font-bold text-green-900 mt-1"><span id="weeklyIncome">0</span>원</div>
+                </div>
+                <div class="bg-pink-50 rounded-2xl border-2 border-chiikawaBorder p-3">
+                    <div class="text-xs text-pink-700 font-bold">이번 주 총 소비</div>
+                    <div class="font-gaegu text-2xl font-bold text-pink-900 mt-1"><span id="weeklyExpense">0</span>원</div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- MODAL 1: ADD TRANSACTION (Income or Expense) -->
+    <div id="transModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white border-4 border-chiikawaBorder rounded-3xl w-full max-w-sm p-5 shadow-2xl relative animate-bounce-short">
+            <button onclick="closeModal()" class="absolute top-3 right-3 w-8 h-8 bg-gray-100 border-2 border-chiikawaBorder rounded-full flex items-center justify-center text-gray-600 font-bold">
+                ✕
+            </button>
+            <h3 id="modalTitle" class="font-gaegu text-2xl font-bold text-gray-800 mb-4 text-center">알바 보수 봉투 받기</h3>
+
+            <form id="transForm" onsubmit="handleFormSubmit(event)" class="space-y-4">
+                <input type="hidden" id="transType" value="income">
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-600 mb-1">어떤 활동인가요?</label>
+                    <input type="text" id="transTitle" placeholder="예: 심부름 하기, 간식 사기" required
+                        class="w-full border-2 border-chiikawaBorder rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-600 mb-1">금액 (원)</label>
+                    <input type="number" id="transAmount" min="10" placeholder="예: 1000" required
+                        class="w-full border-2 border-chiikawaBorder rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-600 mb-1">카테고리 선택</label>
+                    <select id="transCategory" class="w-full border-2 border-chiikawaBorder rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300">
+                        <option value="알바/용돈">💼 알바/용돈 수입</option>
+                        <option value="맛있는것">🍡 맛있는 것 (간식/음식)</option>
+                        <option value="귀여운소품">🧸 귀여운 소품 (문구/장난감)</option>
+                        <option value="취미/놀이">🎮 취미 & 놀이</option>
+                        <option value="기타">🎁 기타</option>
+                    </select>
+                </div>
+
+                <button type="submit" id="modalSubmitBtn" class="w-full py-3 bg-yellow-400 hover:bg-yellow-500 border-3 border-chiikawaBorder rounded-2xl font-gaegu text-xl font-bold text-gray-900 shadow-[2px_3px_0px_#4A3E3D] active:translate-y-0.5 active:shadow-none transition-all mt-2">
+                    등록하고 치이카와 반응 보기!
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 2: ADD WISH ITEM -->
+    <div id="wishModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white border-4 border-chiikawaBorder rounded-3xl w-full max-w-sm p-5 shadow-2xl relative">
+            <button onclick="closeWishModal()" class="absolute top-3 right-3 w-8 h-8 bg-gray-100 border-2 border-chiikawaBorder rounded-full flex items-center justify-center text-gray-600 font-bold">
+                ✕
+            </button>
+            <h3 class="font-gaegu text-2xl font-bold text-gray-800 mb-4 text-center">새로운 위시목표 설정</h3>
+
+            <form id="wishForm" onsubmit="handleWishSubmit(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-600 mb-1">사고 싶은 아이템 이름</label>
+                    <input type="text" id="wishTitle" placeholder="예: 무시시 토끼 인형" required
+                        class="w-full border-2 border-chiikawaBorder rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-600 mb-1">목표 금액 (원)</label>
+                    <input type="number" id="wishAmount" min="100" placeholder="예: 5000" required
+                        class="w-full border-2 border-chiikawaBorder rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-600 mb-1">아이콘 선택</label>
+                    <select id="wishIcon" class="w-full border-2 border-chiikawaBorder rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+                        <option value="fa-camera-retro">📷 하치와레 카메라</option>
+                        <option value="fa-shirt">👕 곰돌이 옷/착장</option>
+                        <option value="fa-book">📘 토끼 공부책</option>
+                        <option value="fa-gamepad">🎮 게임기</option>
+                        <option value="fa-wand-magic-sparkles">🪄 요술봉</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="w-full py-3 bg-chiikawaBlueDark hover:bg-blue-400 border-3 border-chiikawaBorder rounded-2xl font-gaegu text-xl font-bold text-white shadow-[2px_3px_0px_#4A3E3D] active:translate-y-0.5 active:shadow-none transition-all mt-2">
+                    목표 등록하기!
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- AUDIO SOUND EFFECTS (Web Audio API Synthesized) -->
+    <script>
+        // Web Audio Synthesizer for Chiikawa Sounds
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+
+            if (type === 'income') {
+                // Happy high chimes (Nyahah tone)
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523.25, now); // C5
+                osc.frequency.exponentialRampToValueAtTime(659.25, now + 0.1); // E5
+                osc.frequency.exponentialRampToValueAtTime(783.99, now + 0.2); // G5
+                osc.frequency.exponentialRampToValueAtTime(1046.50, now + 0.35); // C6
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+                osc.start(now);
+                osc.stop(now + 0.4);
+            } else if (type === 'expense') {
+                // Cute nibble sound (Nom nom)
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.exponentialRampToValueAtTime(250, now + 0.1);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                osc.start(now);
+                osc.stop(now + 0.15);
+            } else if (type === 'unlock') {
+                // Fanfare unlock sound
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(587.33, now); // D5
+                osc.frequency.setValueAtTime(880, now + 0.15); // A5
+                gain.gain.setValueAtTime(0.4, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                osc.start(now);
+                osc.stop(now + 0.5);
+            }
+        }
+    </script>
+
+    <!-- APPLICATION LOGIC & STATE MANAGEMENT -->
+    <script>
+        // Application State
+        let state = {
+            balance: 1500,
+            transactions: [
+                { id: 1, type: 'income', title: '청소 알바 보수', amount: 2000, category: '알바/용돈', date: '2026-11-07' },
+                { id: 2, type: 'expense', title: '디저트 사먹기', amount: 500, category: '맛있는것', date: '2026-11-08' }
+            ],
+            wishlist: [
+                { id: 1, title: '귀여운 토끼 필통', amount: 3000, icon: 'fa-book', unlocked: false },
+                { id: 2, title: '분홍색 곰인형', amount: 5000, icon: 'fa-shirt', unlocked: false }
+            ]
+        };
+
+        let chartInstance = null;
+
+        // Load Initial State from LocalStorage if available
+        function loadState() {
+            const saved = localStorage.getItem('chiikawa_economy_db');
+            if (saved) {
+                try {
+                    state = JSON.parse(saved);
+                } catch(e) {
+                    console.error("Failed to parse saved state", e);
+                }
+            }
+            updateBalance();
+            renderTransactions();
+            renderWishlist();
+            updateUnlockedItemsUI();
+        }
+
+        function saveState() {
+            localStorage.setItem('chiikawa_economy_db', JSON.stringify(state));
+        }
+
+        // Calculate Balance
+        function updateBalance() {
+            const totalIncome = state.transactions.filter(t => t.type === 'income').reduce((acc, cur) => acc + cur.amount, 0);
+            const totalExpense = state.transactions.filter(t => t.type === 'expense').reduce((acc, cur) => acc + cur.amount, 0);
+            state.balance = totalIncome - totalExpense;
+
+            document.getElementById('userBalanceDisplay').innerText = state.balance.toLocaleString();
+            checkWishlistAutoUnlock();
+            saveState();
+        }
+
+        // Switch Active Tab
+        function switchTab(tabName) {
+            const tabs = ['ledger', 'wishlist', 'report'];
+            tabs.forEach(t => {
+                document.getElementById(`section${t.charAt(0).toUpperCase() + t.slice(1)}`).classList.add('hidden');
+                const btn = document.getElementById(`tab${t.charAt(0).toUpperCase() + t.slice(1)}`);
+                btn.className = "flex-1 py-2 rounded-xl text-gray-600 transition-all";
+            });
+
+            // Highlight selected tab
+            document.getElementById(`section${tabName.charAt(0).toUpperCase() + tabName.slice(1)}`).classList.remove('hidden');
+            const activeBtn = document.getElementById(`tab${tabName.charAt(0).toUpperCase() + tabName.slice(1)}`);
+            activeBtn.className = "flex-1 py-2 rounded-xl bg-white shadow-sm border border-chiikawaBorder text-pink-500 font-bold transition-all";
+
+            if (tabName === 'report') {
+                renderReport();
+            }
+        }
+
+        // Modal Controls
+        function openModal(type) {
+            const modal = document.getElementById('transModal');
+            const title = document.getElementById('modalTitle');
+            const typeInput = document.getElementById('transType');
+            const submitBtn = document.getElementById('modalSubmitBtn');
+
+            typeInput.value = type;
+            if (type === 'income') {
+                title.innerText = "💼 알바 보수 봉투 받기";
+                submitBtn.className = "w-full py-3 bg-yellow-400 hover:bg-yellow-500 border-3 border-chiikawaBorder rounded-2xl font-gaegu text-xl font-bold text-gray-900 shadow-[2px_3px_0px_#4A3E3D] transition-all";
+                document.getElementById('transCategory').value = '알바/용돈';
+            } else {
+                title.innerText = "🍡 맛있는 것 / 소품 구매";
+                submitBtn.className = "w-full py-3 bg-pink-400 hover:bg-pink-500 border-3 border-chiikawaBorder rounded-2xl font-gaegu text-xl font-bold text-white shadow-[2px_3px_0px_#4A3E3D] transition-all";
+                document.getElementById('transCategory').value = '맛있는것';
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('transModal').classList.add('hidden');
+            document.getElementById('transForm').reset();
+        }
+
+        function openWishModal() {
+            document.getElementById('wishModal').classList.remove('hidden');
+        }
+
+        function closeWishModal() {
+            document.getElementById('wishModal').classList.add('hidden');
+            document.getElementById('wishForm').reset();
+        }
+
+        // Form Submission Handlers
+        function handleFormSubmit(e) {
+            e.preventDefault();
+            const type = document.getElementById('transType').value;
+            const title = document.getElementById('transTitle').value.trim();
+            const amount = parseInt(document.getElementById('transAmount').value);
+            const category = document.getElementById('transCategory').value;
+
+            if (!title || isNaN(amount) || amount <= 0) return;
+
+            const newTrans = {
+                id: Date.now(),
+                type,
+                title,
+                amount,
+                category,
+                date: new Date().toISOString().split('T')[0]
+            };
+
+            state.transactions.unshift(newTrans);
+            updateBalance();
+            renderTransactions();
+            closeModal();
+
+            // Trigger Character Reactions
+            triggerCharacterReaction(type, title);
+        }
+
+        function handleWishSubmit(e) {
+            e.preventDefault();
+            const title = document.getElementById('wishTitle').value.trim();
+            const amount = parseInt(document.getElementById('wishAmount').value);
+            const icon = document.getElementById('wishIcon').value;
+
+            if (!title || isNaN(amount) || amount <= 0) return;
+
+            const newWish = {
+                id: Date.now(),
+                title,
+                amount,
+                icon,
+        // Audio Synthesizer sound effect
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+
+            if (type === 'income') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523.25, now);
+                osc.frequency.exponentialRampToValueAtTime(659.25, now + 0.1);
+                osc.frequency.exponentialRampToValueAtTime(783.99, now + 0.2);
+                osc.frequency.exponentialRampToValueAtTime(1046.50, now + 0.35);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+                osc.start(now);
+                osc.stop(now + 0.4);
+            } else if (type === 'expense') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.exponentialRampToValueAtTime(250, now + 0.1);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                osc.start(now);
+                osc.stop(now + 0.15);
+            } else if (type === 'unlock') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(587.33, now);
+                osc.frequency.setValueAtTime(880, now + 0.15);
+                gain.gain.setValueAtTime(0.4, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                osc.start(now);
+                osc.stop(now + 0.5);
+            }
+        }
+
+        // Character Interactive Animations & Item Overlays
+        function triggerCharacterReaction(type, title) {
+            const usagi = document.getElementById('usagiSvg');
+            const overlay = document.getElementById('heldItemOverlay');
+
+            if (type === 'income') {
+                usagi.className = "w-36 h-36 transition-transform duration-300 animate-chii-dance";
+                playSound('income');
+                
+                triggerSpeech(`"${title}" 알바 성공! 보수 봉투를 받았어요! 💰`);
+
+                overlay.innerHTML = `
+                    <div class="absolute bottom-2 right-4 animate-bounce">
+                        <div class="w-10 h-8 bg-pink-200 border-2 border-chiikawaBorder rounded-md flex items-center justify-center text-xs font-bold shadow-md transform rotate-12">
+                            💰 報酬
+                        </div>
+                    </div>
+                `;
+
+                confetti({ particleCount: 40, spread: 50, origin: { y: 0.5 } });
+
+            } else {
+                usagi.className = "w-36 h-36 transition-transform duration-300 animate-chii-eat";
+                playSound('expense');
+
+                triggerSpeech(`"${title}"(을)를 구매했어요! 😋`);
+
+                overlay.innerHTML = `
+                    <div class="absolute bottom-4 left-4 animate-pulse">
+                        <div class="w-9 h-9 bg-pink-200 border-2 border-chiikawaBorder rounded-full flex items-center justify-center text-lg shadow-md transform -rotate-12">
+                            🛍️
+                        </div>
+                    </div>
+                `;
+            }
+
+            setTimeout(() => {
+                usagi.className = "w-36 h-36 transition-transform duration-300";
+                overlay.innerHTML = '';
+            }, 3500);
+        }
+
+        function triggerSpeech(text) {
+            document.getElementById('speechText').innerText = text;
+        }
+
+        // Auto check wishlist unlocks & reward feedback
+        function checkWishlistAutoUnlock() {
+            let newlyUnlocked = false;
+            state.wishlist.forEach(wish => {
+                if (!wish.unlocked && state.balance >= wish.amount) {
+                    wish.unlocked = true;
+                    newlyUnlocked = true;
+                }
+            });
+
+            if (newlyUnlocked) {
+                confetti({
+                    particleCount: 80,
+                    spread: 60,
+                    origin: { y: 0.6 }
+                });
+                playSound('unlock');
+                triggerSpeech("축하해요! 사고 싶던 위시목표를 해금했어요! ✨");
+            }
+
+            renderWishlist();
+            updateUnlockedItemsUI();
+        }
+
+        function updateUnlockedItemsUI() {
+            const count = state.wishlist.filter(w => w.unlocked).length;
+            document.getElementById('unlockedItemsCount').innerHTML = `<i class="fa-solid fa-gift"></i> 아이템 ${count}개 해금`;
+        }
+
+        // Character Interactive Animations & Item Overlays
+        function triggerCharacterReaction(type, title) {
+            const chii = document.getElementById('chiikawaImg');
+            const overlay = document.getElementById('heldItemOverlay');
+
+            if (type === 'income') {
+                // Dance animation & Reward Envelope Overlay
+                chii.className = "w-full h-full object-contain transition-transform duration-300 animate-chii-dance";
+                playSound('income');
+                
+                triggerSpeech(`"${title}" 알바 성공! 보수 봉투 받았어! (와-!)`);
+
+                // Insert Envelope Graphic
+                overlay.innerHTML = `
+                    <div class="absolute bottom-2 right-4 animate-bounce">
+                        <div class="w-10 h-8 bg-yellow-300 border-2 border-chiikawaBorder rounded-md flex items-center justify-center text-xs font-bold shadow-md transform rotate-12">
+                            💰 報酬
+                        </div>
+                    </div>
+                `;
+
+                confetti({ particleCount: 40, spread: 50, origin: { y: 0.5 } });
+
+            } else {
+                // Eating / Prop Holding Reaction
+                chii.className = "w-full h-full object-contain transition-transform duration-300 animate-chii-eat";
+                playSound('expense');
+
+                triggerSpeech(`"${title}"(을)를 가졌어! 음~ 냐하! 😋`);
+
+                // Insert Prop Overlay (Food or Item)
+                overlay.innerHTML = `
+                    <div class="absolute bottom-4 left-4 animate-pulse">
+                        <div class="w-9 h-9 bg-pink-200 border-2 border-chiikawaBorder rounded-full flex items-center justify-center text-lg shadow-md transform -rotate-12">
+                            🍱
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Reset after 3.5 seconds to default static image without any bounce animation
+            setTimeout(() => {
+                chii.className = "w-full h-full object-contain transition-transform duration-300";
+                overlay.innerHTML = '';
+            }, 3500);
+        }
+
+        function triggerSpeech(text) {
+            document.getElementById('speechText').innerText = text;
+        }
+
+        // TAB 3: Render Weekly Report & Chart
+        function renderReport() {
+            const expenses = state.transactions.filter(t => t.type === 'expense');
+            const incomes = state.transactions.filter(t => t.type === 'income');
+
+            const totalInc = incomes.reduce((sum, item) => sum + item.amount, 0);
+            const totalExp = expenses.reduce((sum, item) => sum + item.amount, 0);
+
+            document.getElementById('weeklyIncome').innerText = totalInc.toLocaleString();
+            document.getElementById('weeklyExpense').innerText = totalExp.toLocaleString();
+
+            const categories = {};
+            expenses.forEach(item => {
+                categories[item.category] = (categories[item.category] || 0) + item.amount;
+            });
+
+            const labels = Object.keys(categories);
+            const dataValues = Object.values(categories);
+
+            const stamp = document.getElementById('stampBadge');
+            const feedbackText = document.getElementById('reportFeedbackText');
+            const reportTitle = document.getElementById('reportTitle');
+
+            stamp.classList.remove('stamp-animate');
+
+            setTimeout(() => {
+                if (totalInc >= totalExp && totalInc > 0) {
+                    reportTitle.innerText = "이번 주 알뜰 저축왕!";
+                    feedbackText.innerText = "번 돈보다 아껴서 차곡차곡 저축했네요! 정말 훌륭합니다!";
+                    stamp.innerHTML = `참 잘했어요!<br><i class="fa-solid fa-star text-xs"></i>`;
+                    stamp.className = "w-20 h-20 flex items-center justify-center transform -rotate-12 border-4 border-pink-500 rounded-full text-pink-600 font-gaegu font-bold text-lg text-center p-1 leading-tight shadow-lg stamp-animate bg-white/80";
+                } else if (totalExp > totalInc) {
+                    reportTitle.innerText = "지출이 많았던 주간!";
+                    feedbackText.innerText = "지출이 수입보다 많아요! 다음 주에는 조금 더 아껴보아요.";
+                    stamp.innerHTML = `다음주 화이팅!<br><i class="fa-solid fa-heart text-xs"></i>`;
+                    stamp.className = "w-20 h-20 flex items-center justify-center transform -rotate-12 border-4 border-rose-400 rounded-full text-rose-500 font-gaegu font-bold text-base text-center p-1 leading-tight shadow-lg stamp-animate bg-white/80";
+                } else {
+                    reportTitle.innerText = "기록을 시작해보세요!";
+                    feedbackText.innerText = "알바 보수를 기록하고 용돈 다이어리를 차곡차곡 채워보세요!";
+                    stamp.innerHTML = `화이팅!<br><i class="fa-solid fa-thumbs-up text-xs"></i>`;
+                    stamp.className = "w-20 h-20 flex items-center justify-center transform -rotate-12 border-4 border-pink-400 rounded-full text-pink-500 font-gaegu font-bold text-base text-center p-1 leading-tight shadow-lg stamp-animate bg-white/80";
+                }
+            }, 100);
+        // Character Interactive Animations & Item Overlays
+        function triggerCharacterReaction(type, title) {
+            const usagi = document.getElementById('usagiSvg');
+            const overlay = document.getElementById('heldItemOverlay');
+
+            if (type === 'income') {
+                usagi.className = "w-36 h-36 transition-transform duration-300 animate-chii-dance";
+                playSound('income');
+                
+                triggerSpeech(`"${title}" 알바 완료! 야하~!! 💰`);
+
+                overlay.innerHTML = `
+                    <div class="absolute bottom-2 right-4 animate-bounce">
+                        <div class="w-10 h-8 bg-yellow-300 border-2 border-chiikawaBorder rounded-md flex items-center justify-center text-xs font-bold shadow-md transform rotate-12">
+                            💰 報酬
+                        </div>
+                    </div>
+                `;
+
+                confetti({ particleCount: 40, spread: 50, origin: { y: 0.5 } });
+
+            } else {
+                usagi.className = "w-36 h-36 transition-transform duration-300 animate-chii-eat";
+                playSound('expense');
+
+                triggerSpeech(`"${title}"(을)를 구매했어! 우라라라~! 😋`);
+
+                overlay.innerHTML = `
+                    <div class="absolute bottom-4 left-4 animate-pulse">
+                        <div class="w-9 h-9 bg-yellow-200 border-2 border-chiikawaBorder rounded-full flex items-center justify-center text-lg shadow-md transform -rotate-12">
+                            🥕
+                        </div>
+                    </div>
+                `;
+            }
+
+            setTimeout(() => {
+                usagi.className = "w-36 h-36 transition-transform duration-300";
+                overlay.innerHTML = '';
+            }, 3500);
+        }
+
+        function triggerSpeech(text) {
+            document.getElementById('speechText').innerText = text;
+        }
+
+            if (labels.length === 0) {
+                ctx.clearRect(0, 0, 200, 200);
+                return;
+            }
+
+            chartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: dataValues,
+                        backgroundColor: [
+                            '#FF9EAA',
+                            '#79C9FA',
+                            '#FFE600',
+                            '#B388FF',
+                            '#81C784'
+                        ],
+                        borderWidth: 3,
+                        borderColor: '#4A3E3D'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                font: {
+                                    family: 'Gaegu',
+                                    size: 16
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Helper Utility to prevent XSS
+        function escapeHtml(str) {
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+
+        // Initialize on Window Load
+        window.onload = function() {
+            loadState();
+        };
+    </script>
+</body>
+</html>
